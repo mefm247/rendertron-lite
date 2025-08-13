@@ -1,0 +1,8 @@
+{
+  "name": "rendertron-lite",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@cloudflare/puppeteer": "latest"
+  }
+}

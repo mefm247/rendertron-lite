@@ -1,0 +1,7 @@
+name = "rendertron-lite"
+main = "src/index.js"
+compatibility_date = "2025-08-13"
+compatibility_flags = ["nodejs_compat"]
+
+# Bind Cloudflare Browser Rendering (Chromium) to env.MYBROWSER
+browser = { binding = "MYBROWSER" }
