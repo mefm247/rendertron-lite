@@ -290,12 +290,21 @@ function toBase64(uint8) {
   return btoa(binary);
 }
 
+// helper to append the source URL into the prompt text safely
+function buildPromptWithSource(prompt, url) {
+  const suffix = url ? `\n\n[Source URL: ${url}]` : "";
+  return (prompt || "").trim() + suffix;
+}
+
 async function postToAI({ endpoint, apiKey, prompt, url, screenshotPng, timeoutMs }) {
+  // Generic JSON payload:
+  // - Don’t include unknown fields like `source_url`
+  // - Provide image as base64 with mime, and the full prompt text (prompt + URL)
   const payload = {
-    prompt,
-    source_url: url,
+    prompt: buildPromptWithSource(prompt, url),
     image: { mime: "image/png", base64: toBase64(screenshotPng) },
   };
+
   const headers = { "Content-Type": "application/json" };
   if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
 
@@ -309,12 +318,29 @@ async function postToAI({ endpoint, apiKey, prompt, url, screenshotPng, timeoutM
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
+
     const text = await res.text();
-    try { return JSON.parse(text); } catch { return { raw: text, status: res.status }; }
+
+    // Try JSON; if not JSON, return raw body with status for debugging
+    try {
+      const parsed = JSON.parse(text);
+      // If the API returns an error object, surface status as well
+      if (!res.ok) {
+        return { error: parsed.error || parsed, status: res.status };
+      }
+      return parsed;
+    } catch {
+      // Non-JSON response
+      if (!res.ok) {
+        return { error: { message: text || "AI request failed" }, status: res.status };
+      }
+      return { raw: text, status: res.status };
+    }
   } finally {
     clearTimeout(t);
   }
 }
+
 
 /* -------------------------- Your existing parsing logic -------------------------- */
 
