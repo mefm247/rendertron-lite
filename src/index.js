@@ -18,6 +18,8 @@ import puppeteer from "@cloudflare/puppeteer";
  * - selectorToWaitFor Optional. CSS selector to wait for
  */
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 const SCREENSHOT_ANALYSIS_PROMPT = `
 You are an expert in visual-to-structure translation for websites.
 You will be given a screenshot of a webpage.
@@ -207,18 +209,24 @@ async function readParams(request) {
 }
 
 async function renderPageGetHtml(env, targetUrl) {
-  new URL(targetUrl);
+  new URL(targetUrl); // validate
+
   const browser = await puppeteer.launch(env.MYBROWSER);
   let html = "";
   try {
     const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 800 });
-    await page.goto(targetUrl, { waitUntil: "networkidle0", timeout: 60000 }).catch(async () => {
-      await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
-    });
+
+    // Try networkidle0, fallback to domcontentloaded
+    await page.goto(targetUrl, { waitUntil: "networkidle0", timeout: 60000 })
+      .catch(async () => {
+        await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+      });
+
     await autoScroll(page);
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
-    await page.waitForTimeout(500);
+    await sleep(500); // instead of page.waitForTimeout
+
     html = await page.content();
     await page.close();
   } finally {
@@ -227,20 +235,26 @@ async function renderPageGetHtml(env, targetUrl) {
   return { html };
 }
 
+
 async function renderAndScreenshot({ env, targetUrl, viewport, extraWaitMs, selectorToWaitFor }) {
   const browser = await puppeteer.launch(env.MYBROWSER);
   const page = await browser.newPage();
   try {
     await page.setViewport(viewport);
-    await page.goto(targetUrl, { waitUntil: "networkidle0", timeout: 60000 }).catch(async () => {
-      await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
-    });
+
+    await page.goto(targetUrl, { waitUntil: "networkidle0", timeout: 60000 })
+      .catch(async () => {
+        await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+      });
+
     if (selectorToWaitFor) {
       try { await page.waitForSelector(selectorToWaitFor, { timeout: 15000 }); } catch {}
     }
+
     await autoScroll(page);
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
-    if (extraWaitMs > 0) await page.waitForTimeout(extraWaitMs);
+    if (extraWaitMs > 0) await sleep(extraWaitMs); // instead of page.waitForTimeout
+
     return await page.screenshot({ type: "png", fullPage: true });
   } finally {
     try { await page.close(); } catch {}
