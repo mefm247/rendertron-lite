@@ -9,4 +9,5 @@ binding = "MYBROWSER"
 
 [vars]
 AI_ENDPOINT = "https://api.openai.com/v1/responses"
-AI_TIMEOUT_MS = "45000"
+AI_TIMEOUT_MS = "240000"          # faster cycles; adjust if needed
+OPENAI_MODEL = "gpt-5"     # ⚡ fast + vision-capable
