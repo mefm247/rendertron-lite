@@ -85,7 +85,6 @@ export async function postToAI({
             ],
           },
         ],
-        temperature: 0,
         text: {
           format: {
             type: "json_schema",
