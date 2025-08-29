@@ -4,5 +4,8 @@
   "type": "module",
   "dependencies": {
     "@cloudflare/puppeteer": "latest"
+  },
+  "devDependencies": {
+    "wrangler": "^4.33.1"
   }
 }

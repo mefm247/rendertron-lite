@@ -2,6 +2,11 @@ name = "rendertron-lite"
 main = "src/index.js"
 compatibility_date = "2025-08-13"
 compatibility_flags = ["nodejs_compat"]
-account_id = "c6af148bcfb547ae1e1386dcd8de8dc5"   # add this line
+account_id = "c6af148bcfb547ae1e1386dcd8de8dc5"
 
-browser = { binding = "MYBROWSER" }
+[browser]
+binding = "MYBROWSER"
+
+[vars]
+AI_ENDPOINT = "https://api.openai.com/v1/responses"
+AI_TIMEOUT_MS = "45000"

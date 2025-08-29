@@ -23,64 +23,155 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const SCREENSHOT_ANALYSIS_PROMPT = `
 You are an expert in visual-to-structure translation for websites.
 You will be given a screenshot of a webpage.
-Your job is to analyze the screenshot and output a structured pseudo-language description of the page.
+Your job is to analyze the screenshot and output a strictly valid JSON object
+that captures the page structure using a uniform, section-based schema.
 
-=== Output Format ===
-Use this structure:
-PAGE {
-  HEADER { ... }
-  HERO { ... }
-  SECTION { ... }
-  SIDEBAR { ... }
-  FOOTER { ... }
-  PAGE_INTENT { "..." }
+=== Output Format (must be valid JSON) ===
+{
+  "page_intent": "Overall description of the page’s communication strategy, emotional tone, target audience, and primary conversion goal.",
+  "meta": {
+    "title": "...",                  // if visible or inferable from the screenshot
+    "language": "...",               // ISO code if visible/inferable, else null
+    "screenshot_notes": "..."        // any constraints or notable artifacts
+  },
+  "sections": [
+    {
+      "id": "sec_001",
+      "type": "header" | "hero" | "content" | "sidebar" | "footer" | "nav" | "callout" | "form" | "gallery" | "testimonials" | "faq" | "pricing" | "features" | "partners" | "legal" | "other",
+      "section_intent": "...",
+      "elements": [
+        {
+          "type": "LOGO" | "HEADING" | "TEXT" | "IMAGE" | "BUTTON" | "LINK" | "VIDEO" | "FORM" | "INPUT" | "LIST" | "LIST_ITEM" | "ICON" | "BADGE" | "CARD" | "TABLE" | "TAG" | "BREADCRUMB",
+          "text": "...",                 // exact visible text, if present; else ""
+          "alt": "...",                  // literal description for non-text visuals; else ""
+          "intent": "...",               // why it exists / how it influences perception
+          "url": "...",                  // href/src if visible; else ""
+          "name": "...",                 // element name/label (e.g., input name, icon name)
+          "state": {
+            "emphasis": "primary|secondary|tertiary|muted|neutral|danger|success|warning|info|none",
+            "disabled": false,
+            "selected": false,
+            "active": false,
+            "visible": true
+          },
+          "layout": {
+            "order": 0,                  // visual reading order within the section
+            "bounding_box": { "x": 0, "y": 0, "width": 0, "height": 0 }, // pixels if you can infer; else null
+            "alignment": "left|center|right|justify|stretch|unknown"
+          },
+          "form_meta": {
+            "role": "form|input|label|checkbox|radio|select|textarea|submit|none",
+            "required": false,
+            "placeholder": "...",
+            "options": [ "..." ]         // for selects/radios/lists; else []
+          },
+          "list_meta": {
+            "ordered": false,
+            "items": [                   // when type === "LIST"
+              { "text": "...", "intent": "...", "alt": "" }
+            ]
+          }
+        }
+      ]
+    }
+  ]
 }
 
-Allowed elements inside sections:
-LOGO, HEADING, TEXT, IMAGE, BUTTON, LINK, VIDEO, FORM, INPUT, LIST, LIST_ITEM
+=== Rules ===
+1) Use ONLY this JSON structure. No extra top-level keys. No comments in the final output.
+2) The entire page must be represented through the "sections" array. The hero is a section with "type": "hero".
+3) Be exhaustive: include every visible block (header, nav, hero, content blocks, sidebars, footers, banners, notices, cookie bars, etc.).
+4) Be descriptive for visuals: for images/icons/video, fill "alt" with a literal, concrete description.
+5) Focus on intent for both sections and elements.
+6) Do not invent content that isn’t visible. If a field is unknown, use "" (empty string) or null where appropriate.
+7) Keep JSON valid: no trailing commas, correct quoting, arrays/objects only as specified.
+8) If something doesn’t fit known types, use section.type = "other" or element.type = "CARD"/"ICON"/"TAG" as the closest match and explain in "intent".
 
-For each ELEMENT, always include:
-- text: "..." (exact visible text, if present)
-- alt: "..." (literal description of the image/icon/video if present)
-- intent: "..." (why it is included, or how it influences user perception)
-
-For each SECTION, include:
-- section_intent: "..." (overall purpose of this section)
-
-At the end of the file, include:
-PAGE_INTENT {
-  "Overall description of the page’s communication strategy, emotional tone,
-   target audience, and primary conversion goal."
+=== Short Example ===
+{
+  "page_intent": "Establish credibility with business users and drive sign-ups.",
+  "meta": {
+    "title": "BlueTech — Smarter Tools",
+    "language": "en",
+    "screenshot_notes": ""
+  },
+  "sections": [
+    {
+      "id": "sec_header",
+      "type": "header",
+      "section_intent": "Provide brand identity and quick navigation.",
+      "elements": [
+        {
+          "type": "LOGO",
+          "text": "",
+          "alt": "BlueTech wordmark logo",
+          "intent": "Modern, tech-focused branding.",
+          "url": "",
+          "name": "BlueTech",
+          "state": { "emphasis": "none", "disabled": false, "selected": false, "active": false, "visible": true },
+          "layout": { "order": 0, "bounding_box": null, "alignment": "left" },
+          "form_meta": { "role": "none", "required": false, "placeholder": "", "options": [] },
+          "list_meta": { "ordered": false, "items": [] }
+        },
+        {
+          "type": "LINK",
+          "text": "Pricing",
+          "alt": "",
+          "intent": "Guide user toward conversion decision.",
+          "url": "/pricing",
+          "name": "",
+          "state": { "emphasis": "primary", "disabled": false, "selected": false, "active": false, "visible": true },
+          "layout": { "order": 1, "bounding_box": null, "alignment": "right" },
+          "form_meta": { "role": "none", "required": false, "placeholder": "", "options": [] },
+          "list_meta": { "ordered": false, "items": [] }
+        }
+      ]
+    },
+    {
+      "id": "sec_hero",
+      "type": "hero",
+      "section_intent": "Capture attention and drive sign-ups.",
+      "elements": [
+        {
+          "type": "IMAGE",
+          "text": "",
+          "alt": "Abstract blue gradient background with subtle grid",
+          "intent": "Futuristic and professional tone.",
+          "url": "",
+          "name": "",
+          "state": { "emphasis": "none", "disabled": false, "selected": false, "active": false, "visible": true },
+          "layout": { "order": 0, "bounding_box": null, "alignment": "center" },
+          "form_meta": { "role": "none", "required": false, "placeholder": "", "options": [] },
+          "list_meta": { "ordered": false, "items": [] }
+        },
+        {
+          "type": "HEADING",
+          "text": "Smarter Tools for Modern Teams",
+          "alt": "",
+          "intent": "Highlight value proposition.",
+          "url": "",
+          "name": "h1",
+          "state": { "emphasis": "primary", "disabled": false, "selected": false, "active": true, "visible": true },
+          "layout": { "order": 1, "bounding_box": null, "alignment": "center" },
+          "form_meta": { "role": "none", "required": false, "placeholder": "", "options": [] },
+          "list_meta": { "ordered": false, "items": [] }
+        },
+        {
+          "type": "BUTTON",
+          "text": "Get Started",
+          "alt": "",
+          "intent": "Primary call-to-action.",
+          "url": "/signup",
+          "name": "cta_primary",
+          "state": { "emphasis": "primary", "disabled": false, "selected": false, "active": true, "visible": true },
+          "layout": { "order": 2, "bounding_box": null, "alignment": "center" },
+          "form_meta": { "role": "submit", "required": false, "placeholder": "", "options": [] },
+          "list_meta": { "ordered": false, "items": [] }
+        }
+      ]
+    }
+  ]
 }
-
-=== Example (shortened) ===
-HEADER {
-  section_intent: "Provide brand identity and quick navigation"
-  LOGO { alt: "BlueTech wordmark" intent: "Modern, tech-focused branding" }
-  NAVIGATION {
-    LINK { text: "Home" intent: "Return to entry point" }
-    LINK { text: "Pricing" intent: "Guide user toward conversion decision" }
-  }
-}
-
-HERO {
-  section_intent: "Capture attention and drive sign-ups"
-  IMAGE { alt: "Abstract blue background" intent: "Futuristic and professional tone" }
-  HEADING { text: "Smarter Tools for Modern Teams" intent: "Highlight value proposition" }
-  BUTTON { text: "Get Started" intent: "Primary call-to-action" }
-}
-
-PAGE_INTENT {
-  "This page is designed to establish credibility with business users,
-   emphasize trust and innovation, and funnel visitors toward creating an account."
-}
-
-=== Instructions ===
-- Be exhaustive: include every visible block of content.
-- Be descriptive: especially for images, icons, and visuals.
-- Focus on intent: why is this element or section included? How is it meant to affect the user?
-- Do not invent things that aren’t visible.
-- Do not output HTML, CSS, or JS — only the pseudo-language.
 `;
 
 export default {
@@ -296,50 +387,72 @@ function buildPromptWithSource(prompt, url) {
   return (prompt || "").trim() + suffix;
 }
 
+function isOpenAIResponsesEndpoint(endpoint) {
+  try {
+    const u = new URL(endpoint);
+    return u.hostname.includes("api.openai.com") || u.pathname.endsWith("/v1/responses");
+  } catch {
+    return false;
+  }
+}
+
 async function postToAI({ endpoint, apiKey, prompt, url, screenshotPng, timeoutMs }) {
-  // Generic JSON payload:
-  // - Don’t include unknown fields like `source_url`
-  // - Provide image as base64 with mime, and the full prompt text (prompt + URL)
-  const payload = {
-    prompt: buildPromptWithSource(prompt, url),
-    image: { mime: "image/png", base64: toBase64(screenshotPng) },
-  };
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort("AI request timed out"), timeoutMs);
 
   const headers = { "Content-Type": "application/json" };
   if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
 
-  const controller = new AbortController();
-  const t = setTimeout(() => controller.abort("AI request timed out"), timeoutMs);
-
   try {
+    const imageDataUrl = `data:image/png;base64,${toBase64(screenshotPng)}`;
+
+    const body = {
+      model: "gpt-4o",
+      input: [
+        {
+          role: "user",
+          content: [
+            { type: "input_image", image_url: imageDataUrl },
+            { type: "input_text", text: buildPromptWithSource(prompt, url) },
+          ],
+        },
+      ],
+    };
+
     const res = await fetch(endpoint, {
       method: "POST",
       headers,
-      body: JSON.stringify(payload),
+      body: JSON.stringify(body),
       signal: controller.signal,
     });
 
-    const text = await res.text();
+    const json = await res.json();
 
-    // Try JSON; if not JSON, return raw body with status for debugging
-    try {
-      const parsed = JSON.parse(text);
-      // If the API returns an error object, surface status as well
-      if (!res.ok) {
-        return { error: parsed.error || parsed, status: res.status };
+    // ✅ Extract just the structured pseudo-language text
+    if (json.output && Array.isArray(json.output)) {
+      for (const msg of json.output) {
+        if (msg.content) {
+          for (const c of msg.content) {
+            if (c.type === "output_text" && c.text) {
+              return c.text;   // only return the text
+            }
+          }
+        }
       }
-      return parsed;
-    } catch {
-      // Non-JSON response
-      if (!res.ok) {
-        return { error: { message: text || "AI request failed" }, status: res.status };
-      }
-      return { raw: text, status: res.status };
     }
+
+    // fallback: return output_text if present
+    if (typeof json.output_text === "string") {
+      return json.output_text;
+    }
+
+    // if nothing matches, return whole object (debug)
+    return json(aiResponse, 200);
   } finally {
     clearTimeout(t);
   }
 }
+
 
 
 /* -------------------------- Your existing parsing logic -------------------------- */
