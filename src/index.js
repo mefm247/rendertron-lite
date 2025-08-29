@@ -9,6 +9,7 @@ import { handleStructure } from "./handlers/structure.js";
 import { handleScreenshot } from "./handlers/screenshot.js";
 import { handleAiCombined } from "./handlers/aiCombined.js";
 import { OUTPUT_MODES } from "./config/constants.js";
+import { safeHandler } from "./utils/safeHandler.js";
 
 export default {
   async fetch(request, env) {
@@ -34,9 +35,9 @@ export default {
         return json({ error: `Missing or invalid 'output'. Use one of: ${OUTPUT_MODES.join(" | ")}` }, 400);
       }
 
-      if (output === "html") return await handleHtml(env, params, tag);
-      if (output === "structure") return await handleStructure(env, params, tag);
-      if (output === "screenshot") return await handleScreenshot(env, params, tag);
+      if (output === "html") return await safeHandler(handleHtml)(env, params, tag, rid);
+      if (output === "structure") return await safeHandler(handleStructure)(env, params, tag, rid);
+      if (output === "screenshot") return await safeHandler(handleScreenshot)(env, params, tag, rid);
       if (output === "ai-describe") {
         if (!env.AI_ENDPOINT) return json({ error: "Missing AI_ENDPOINT env var" }, 500);
         const imgB64 = params.imageBase64;
@@ -48,35 +49,40 @@ export default {
         const format = (params.format || "json").toLowerCase();
         const basePrompt = params.prompt && params.prompt.trim().length > 0 ? params.prompt : SCREENSHOT_ANALYSIS_PROMPT;
         const finalPrompt = buildPromptWithSource(basePrompt, params.target || "");
-        const aiResponse = await postToAI({
-          endpoint: env.AI_ENDPOINT,
-          apiKey: env.AI_API_KEY,
-          prompt: finalPrompt,
-          url: params.target || "",
-          screenshotPng: bytes,
-          timeoutMs: parseInt(env.AI_TIMEOUT_MS || "60000", 10),
-          mime: imgMime,
-          reqId: rid,
-          model,
-          format,
-        });
-        if (format === "json") {
-          const obj = sanitizeSchema(normalizeToJSONObject(aiResponse));
-          return json(obj, 200);
+        try {
+          const aiResponse = await postToAI({
+            endpoint: env.AI_ENDPOINT,
+            apiKey: env.AI_API_KEY,
+            prompt: finalPrompt,
+            url: params.target || "",
+            screenshotPng: bytes,
+            timeoutMs: parseInt(env.AI_TIMEOUT_MS || "60000", 10),
+            mime: imgMime,
+            reqId: rid,
+            model,
+            format,
+          });
+          if (format === "json") {
+            const obj = sanitizeSchema(normalizeToJSONObject(aiResponse));
+            return json(obj, 200);
+          }
+          return new Response(typeof aiResponse === "string" ? aiResponse : JSON.stringify(aiResponse, null, 2), {
+            status: 200,
+            headers: { ...corsHeaders(), "Content-Type": "application/json; charset=utf-8" },
+          });
+        } catch (err) {
+          console.error(`[${tag}] ai-describe ERROR`, err?.stack || err?.message || String(err));
+          return json({ error: err?.message || "AI describe failed" }, 500);
         }
-        return new Response(typeof aiResponse === "string" ? aiResponse : JSON.stringify(aiResponse, null, 2), {
-          status: 200,
-          headers: { ...corsHeaders(), "Content-Type": "application/json; charset=utf-8" },
-        });
       }
       if (output === "screenshotandai-describe" || output === "ai") {
-        return await handleAiCombined(env, params, tag, rid);
+        return await safeHandler(handleAiCombined)(env, params, tag, rid);
       }
 
       return json({ error: "Unhandled output type" }, 400);
     } catch (err) {
       console.error(`[${tag}] ERROR`, err?.stack || err?.message || String(err));
-      return json({ error: err?.message || String(err) }, 500);
+      return json({ error: err?.message || "Unexpected server error" }, 500);
     } finally {
       logDone(tag, tReq, "request DONE");
     }
