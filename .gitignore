@@ -6,15 +6,20 @@ yarn-error.log*
 pnpm-debug.log*
 
 # Build output
-dist/
+/dist/
 .build/
 .tmp/
 .cache/
 out/
+/worker/
+
+# Ignore zip files
+*.zip
 
 # Local env files (never commit secrets!)
 .env
 .env.*
+*.local
 !.env.example
 
 # MacOS junk
@@ -27,7 +32,19 @@ out/
 .idea/
 *.swp
 *.swo
+*.sublime-workspace
+*.sublime-project
 
-# Wrangler state
+# Wrangler state and build artifacts
 .wrangler/
+.wrangler-state.json
 wrangler.toml.local
+
+# Test output
+coverage/
+*.log
+
+# Misc
+*.tgz
+Thumbs.db
+

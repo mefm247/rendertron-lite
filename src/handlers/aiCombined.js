@@ -5,8 +5,13 @@ import { renderAndScreenshot } from "../render/browser.js";
 import { SCREENSHOT_ANALYSIS_PROMPT } from "../ai/schema.js";
 import { postToAI, buildPromptWithSource } from "../ai/client.js";
 import { sanitizeSchema, normalizeToJSONObject } from "../utils/http.js";
+import { buildCacheKey, cacheGet, cachePut } from "../utils/cache.js";
 
 export async function handleAiCombined(env, params, tag, rid) {
+  // cache: screenshotandai-describe get
+  const cacheKey = buildCacheKey("screenshotandai-describe", params);
+  const cached = await cacheGet(env, cacheKey);
+  if (cached) { return json(JSON.parse(cached), 200); }
   if (!env.MYBROWSER) return json({ error: "Missing MYBROWSER binding" }, 500);
   if (!env.AI_ENDPOINT) return json({ error: "Missing AI_ENDPOINT env var" }, 500);
   if (!params.target) return json({ error: "Missing 'target' parameter" }, 400);
@@ -62,6 +67,7 @@ export async function handleAiCombined(env, params, tag, rid) {
     if (params.includeScreenshot === "true" && shot?.data) {
       obj._screenshot = { mime: shot.mime, base64: toBase64(shot.data) };
     }
+    await cachePut(env, cacheKey, JSON.stringify(obj));
     return json(obj, 200);
   }
 

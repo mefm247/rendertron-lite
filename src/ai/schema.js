@@ -131,3 +131,26 @@ export const ANALYSIS_SCHEMA = {
     },
   },
 };
+
+export const MERGE_PROMPT = `You will receive:
+1) A DOM-derived structure (rough, from HTML parsing).
+2) A screenshot of the page.
+3) Instructions about MODE.
+
+If MODE is "vision-only": Analyze only the screenshot with the strict JSON schema below, ignoring the DOM structure, but you may reference it for naming hints if needed. Output MUST be strictly valid JSON.
+
+If MODE is "merge": You are given both a DOM-derived structure and a vision-derived structure. Merge them into a single, consistent structure that follows the exact JSON schema below. When the two sources conflict:
+- Prefer the screenshot (vision) for visual truth (layout, what is actually visible).
+- Use the DOM structure to fill in missing text or to split large text blocks when helpful.
+- Ensure every visible section from the screenshot is represented. Do not invent content.
+- Be exhaustive: include header, hero, stats, navigation, footer details, etc.
+- Output MUST be strictly valid JSON and conform to the schema exactly.
+
+DOM_STRUCTURE_JSON:
+{{DOM_STRUCTURE_JSON}}
+
+VISION_STRUCTURE_JSON (may be empty if MODE is "vision-only"):
+{{VISION_STRUCTURE_JSON}}
+
+=== Strict JSON Schema to follow ===
+(Same as ANALYSIS_SCHEMA in this codebase; you do not need to restate it in your output — just follow it.)`;

@@ -7,4 +7,7 @@ export const OUTPUT_MODES = [
   "ai-describe",
   "screenshotandai-describe",
   "ai",
+  "merged-structure",
+,
+  "clear-cache"
 ];

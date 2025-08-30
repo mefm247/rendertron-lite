@@ -2,12 +2,14 @@
 import { json, corsHeaders, safeParams, fromBase64, normalizeToJSONObject, sanitizeSchema } from "./utils/http.js";
 import { logStart, logDone, logInfo, newReqId } from "./utils/logging.js";
 import { SCREENSHOT_ANALYSIS_PROMPT } from "./ai/schema.js";
+import { cacheDeletePrefix } from "./utils/cache.js";
 import { postToAI, buildPromptWithSource } from "./ai/client.js";
 
 import { handleHtml } from "./handlers/html.js";
 import { handleStructure } from "./handlers/structure.js";
 import { handleScreenshot } from "./handlers/screenshot.js";
 import { handleAiCombined } from "./handlers/aiCombined.js";
+import { handleMergedStructure } from "./handlers/merge.js";
 import { OUTPUT_MODES } from "./config/constants.js";
 import { safeHandler } from "./utils/safeHandler.js";
 
@@ -77,6 +79,15 @@ export default {
       }
       if (output === "screenshotandai-describe" || output === "ai") {
         return await safeHandler(handleAiCombined)(env, params, tag, rid);
+      }
+
+      if (output === "merged-structure") return await safeHandler(handleMergedStructure)(env, params, tag, rid);
+
+      if (output === "clear-cache") {
+        const prefix = (params.prefix || "").trim() || "";
+        const pref = prefix ? prefix : "";
+        const res = await cacheDeletePrefix(env, pref);
+        return json({ ok: true, ...res }, 200);
       }
 
       return json({ error: "Unhandled output type" }, 400);
